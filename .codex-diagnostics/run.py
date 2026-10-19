@@ -231,7 +231,7 @@ import docker
 source = Path.cwd().resolve()
 distributions = sorted((d.metadata['Name'].lower().replace('_', '-').replace('.', '-'), d.version) for d in m.distributions())
 paths = {name: str(Path(module.__file__).resolve()) for name, module in [('logfire', logfire), ('logging', logging), ('logfire_api', logfire_api), ('observer', contri_first_failure)]}
-result = {'python': sys.version, 'implementation': platform.python_implementation(), 'executable': sys.executable, 'prefix': sys.prefix, 'base_prefix': sys.base_prefix, 'machine': platform.machine(), 'platform': platform.platform(), 'imports': paths, 'source_version': logfire.__version__, 'packages': distributions, 'package_count': len(distributions), 'packages_sha256': hashlib.sha256(json.dumps(distributions, separators=(',', ':')).encode()).hexdigest(), 'coercion_present': '    msg = str(msg)' in inspect.getsource(logging._format_message)}
+result = {'python': sys.version, 'implementation': platform.python_implementation(), 'executable': sys.executable, 'prefix': sys.prefix, 'base_prefix': sys.base_prefix, 'machine': platform.machine(), 'platform': platform.platform(), 'imports': paths, 'source_version': logfire.__version__, 'packages': distributions, 'package_count': len(distributions), 'packages_sha256': hashlib.sha256(json.dumps(distributions, separators=(',', ':')).encode()).hexdigest(), 'api_alias_is_sdk': logfire_api is logfire, 'coercion_present': '    msg = str(msg)' in inspect.getsource(logging._format_message)}
 # Print actual identity before asserting, so mismatch evidence survives.
 print(json.dumps(result), flush=True)
 assert sys.version_info[:3] == (3, 10, 20) and platform.python_implementation() == 'CPython'
@@ -239,7 +239,8 @@ assert platform.machine() == 'x86_64' and sys.platform == 'linux'
 assert Path(sys.prefix).resolve() == source / '.venv'
 assert Path(paths['logfire']) == source / 'logfire-sdk/logfire/__init__.py'
 assert Path(paths['logging']) == source / 'logfire-sdk/logfire/integrations/logging.py'
-assert Path(paths['logfire_api']) == source / 'logfire-api/logfire_api/__init__.py'
+assert logfire_api is logfire
+assert Path(paths['logfire_api']) == Path(paths['logfire'])
 assert Path(paths['observer']) == Path(os.environ['DIAGNOSTIC_HELPERS']) / 'contri_first_failure.py'
 assert logfire.__version__ == m.version('logfire-sdk') == m.version('logfire-api') == '6.0.0b8'
 assert result['coercion_present'] == (os.environ['DIAGNOSTIC_CASE'] == 'patched')
