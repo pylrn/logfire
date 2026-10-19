@@ -1,0 +1,81 @@
+name: Logfire Python 3.10 validation
+
+# Validation of already-published Logfire #2584. This is not a product fix
+# or a workaround for upstream administrators declining a retry.
+on:
+  push:
+    branches:
+      - codex/logfire-py310-diagnostics-20261019
+
+permissions:
+  contents: read
+
+# Serialize repeated pushes as well as limiting each run to two matrix jobs.
+concurrency:
+  group: codex-logfire-py310-diagnostics-20261019
+  cancel-in-progress: false
+
+jobs:
+  diagnostic:
+    if: github.repository == 'pylrn/logfire'
+    name: Python 3.10.20 / ${{ matrix.case }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        include:
+          - case: original
+            source-ref: 060b741354bb7fd2204cd867ad2346068241e296
+          - case: patched
+            source-ref: 41fe9a3feb66b1f90623f9be275b6e4bdb1d29e3
+    env:
+      CI: 'true'
+      COLUMNS: '180'
+      LOGFIRE_SEND_TO_LOGFIRE: 'false'
+      OPENAI_API_KEY: foo
+      ANTHROPIC_API_KEY: foo
+      PYTHONDONTWRITEBYTECODE: '1'
+      PYTHONUNBUFFERED: '1'
+      DIAGNOSTIC_CASE: ${{ matrix.case }}
+      DIAGNOSTIC_SOURCE_REF: ${{ matrix.source-ref }}
+      UV_CACHE_DIR: ${{ runner.temp }}/codex-uv-cache
+    steps:
+      - name: Check out workflow commit helpers
+        id: diagnostic
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          repository: pylrn/logfire
+          ref: ${{ github.sha }}
+          path: diagnostic
+          persist-credentials: false
+
+      - name: Check out immutable matrix source
+        id: source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          repository: pylrn/logfire
+          ref: ${{ matrix.source-ref }}
+          path: source
+          persist-credentials: false
+
+      - name: Block production hosts as in normal CI
+        run: |
+          echo '203.0.113.0 logfire.dev' | sudo tee -a /etc/hosts
+          echo '203.0.113.0 logfire-api.pydantic.dev' | sudo tee -a /etc/hosts
+          echo '203.0.113.0 logfire.pydantic.dev' | sudo tee -a /etc/hosts
+
+      - name: Set up pinned uv without cache uploads
+        uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57
+        with:
+          version: '0.11.1'
+          enable-cache: false
+
+      - name: Frozen setup and bounded full native suite
+        if: ${{ !cancelled() && steps.diagnostic.outcome == 'success' && steps.source.outcome == 'success' }}
+        run: python3 "$GITHUB_WORKSPACE/diagnostic/.codex-diagnostics/run.py"
+
+      - name: Print bounded evidence to Actions logs, including on failure
+        if: ${{ always() && steps.diagnostic.outcome == 'success' }}
+        run: python3 "$GITHUB_WORKSPACE/diagnostic/.codex-diagnostics/run.py" --report-only
