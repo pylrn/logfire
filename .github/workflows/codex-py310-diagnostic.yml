@@ -40,7 +40,7 @@ jobs:
       PYTHONUNBUFFERED: '1'
       DIAGNOSTIC_CASE: ${{ matrix.case }}
       DIAGNOSTIC_SOURCE_REF: ${{ matrix.source-ref }}
-      UV_CACHE_DIR: ${{ runner.temp }}/codex-uv-cache
+      UV_CACHE_DIR: /tmp/codex-uv-cache
     steps:
       - name: Check out workflow commit helpers
         id: diagnostic
